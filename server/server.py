@@ -16,6 +16,7 @@ from utils import (
     get_launcher_json_for_workflow_json,
     get_launcher_state,
     get_project_port,
+    get_project_args,
     is_launcher_json_format,
     is_port_in_use,
     run_command,
@@ -273,6 +274,7 @@ def start_project(id):
 
     # find a free port
     port = get_project_port(id)
+    args = get_project_args(id)
     assert port, "No free port found"
     assert not is_port_in_use(port), f"Port {port} is already in use"
 
@@ -285,6 +287,9 @@ def start_project(id):
     # start the project
     command = f"python main.py --port {port} --listen 0.0.0.0"
 
+    if args is not None:
+        command += " " + args
+
     # check if gpus are available, if they aren't, use the cpu
     mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
     if not torch.cuda.is_available() and not mps_available:
@@ -294,7 +299,7 @@ def start_project(id):
     if os.name == "nt":
         command = f"start \"\" cmd /c \"{command}\""
     
-    print(f"USING COMMAND: {command}. PORT: {port}")
+    print(f"USING COMMAND: {command}. PORT: {port}. ARGS: {args}")
 
     pid = run_command_in_project_comfyui_venv(
         project_path, command, in_bg=True

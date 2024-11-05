@@ -2,7 +2,8 @@
 
 import { Project, Settings } from '@/lib/types'
 import { Button } from './ui/button'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Textarea  } from '@/components/ui/textarea'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import React, { useEffect } from 'react'
 import {
     AlertDialog,
@@ -50,6 +51,10 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
 
     const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] =
         React.useState(false)
+    const [interactArguments, setInteractArguments] =
+        React.useState(false)
+    const [argumentsText, setArgumentsText] = 
+        React.useState<{ [key: string]: string }>({})
 
     const [projectOperation, setProjectOperation] = React.useState<
         'launch' | 'stop' | 'delete'
@@ -86,6 +91,38 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['projects'] })
+        },
+    })
+    const { refetch: refetchArguments } = useQuery({
+        queryKey: ['projectArguments', item.id],
+        queryFn: async () => {
+            const response = await fetch(`/api/projects/${item.id}/getarguments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await response.json();
+            setArgumentsText(prev => ({ ...prev, [item.id]: data.arguments }));
+            return data.arguments || "";
+        },
+        
+        enabled: interactArguments,
+    });           
+
+    const setProjectArguments = useMutation({
+        mutationFn: async () => {
+            const response = await fetch(`/api/projects/${item.id}/setarguments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ arguments: argumentsText[item.id] }),
+            })
+            const data = await response.json()
+            return data
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['projects'] })
+            refetchArguments()
         },
     })
 
@@ -179,6 +216,39 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <AlertDialog
+                open={interactArguments}
+                onOpenChange={(open) => setInteractArguments(open)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Launch Arguments</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <Textarea
+                                name="arguments"
+                                placeholder="Set Launch Arguments"
+                                value={argumentsText[item.id] || ""}
+                                onChange={(e) => setArgumentsText(prev => ({
+                                    ...prev,
+                                    [item.id]: e.target.value
+                                }))}
+                            />
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                setInteractArguments(false)
+                                setProjectArguments.mutate()
+                            }}
+                        >
+                            Save
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <div
                 className={
                     'rounded-md  p-5 border ' +
@@ -209,7 +279,20 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
                             >
                                 Launch
                             </Button>
-                        )}
+                        )}{
+                            item.state.state === 'ready' && (
+                                (
+                                    <Button 
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        setInteractArguments(true)
+                                    }}
+                                    variant="outline">
+                                        Arguments
+                                    </Button>
+                                )
+                            )
+                        }
                         {item.state.state === 'running' &&
                             !!item.state.port && (
                                 <Button variant="default" asChild>

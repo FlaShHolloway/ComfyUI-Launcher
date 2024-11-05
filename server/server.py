@@ -344,6 +344,29 @@ def stop_project(id):
     set_launcher_state_data(project_path, {"state": "ready", "status_message" : "Ready", "port": None, "pid": None})
     return jsonify({"success": True})
 
+@app.route("/api/projects/<id>/setarguments", methods=["POST"])
+def set_arguments(id):
+    project_path = os.path.join(PROJECTS_DIR, id)
+    args_file_path = os.path.join(project_path, "args.txt")
+
+    # Ensure the project exists
+    if not os.path.exists(project_path):
+        return jsonify({"error": f"Project with id {id} does not exist"}), 404
+
+    # Retrieve new arguments from the request body
+    data = request.get_json()
+    arguments = data.get("arguments", "")
+
+    # Create or overwrite the args.txt file
+    with open(args_file_path, "w") as args_file:
+        args_file.write(arguments)
+
+    return jsonify({"success": True})
+
+@app.route("/api/projects/<id>/getarguments", methods=["POST"])
+def get_arguments(id):
+    args = get_project_args(id)
+    return jsonify({"arguments": args})
 
 @app.route("/api/projects/<id>/delete", methods=["POST"])
 def delete_project(id):

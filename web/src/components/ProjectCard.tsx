@@ -3,6 +3,7 @@
 import { Project, Settings } from '@/lib/types'
 import { Button } from './ui/button'
 import { Textarea  } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import React, { useEffect } from 'react'
 import {
@@ -15,7 +16,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
 import { Loader2Icon } from 'lucide-react'
 import { DialogDescription } from '@radix-ui/react-dialog'
 
@@ -51,8 +52,10 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
 
     const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] =
         React.useState(false)
-    const [interactArguments, setInteractArguments] =
+    const [projectSettings, setProjectSettings] =
         React.useState(false)
+    const [portNumber, setPortNumber] = 
+        React.useState<{ [key: string]: string }>({})
     const [argumentsText, setArgumentsText] = 
         React.useState<{ [key: string]: string }>({})
 
@@ -96,26 +99,27 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
     const { refetch: refetchArguments } = useQuery({
         queryKey: ['projectArguments', item.id],
         queryFn: async () => {
-            const response = await fetch(`/api/projects/${item.id}/getarguments`, {
+            const response = await fetch(`/api/projects/${item.id}/get-project-settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });
             const data = await response.json();
             setArgumentsText(prev => ({ ...prev, [item.id]: data.arguments }));
-            return data.arguments || "";
+            setPortNumber(prev => ({ ...prev, [item.id]: data.port }));
+            return data.arguments || "", data.port || "";
         },
         
-        enabled: interactArguments,
+        enabled: projectSettings,
     });           
 
     const setProjectArguments = useMutation({
         mutationFn: async () => {
-            const response = await fetch(`/api/projects/${item.id}/setarguments`, {
+            const response = await fetch(`/api/projects/${item.id}/set-project-settings`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ arguments: argumentsText[item.id] }),
+                body: JSON.stringify({ arguments: argumentsText[item.id], port: portNumber[item.id] }),
             })
             const data = await response.json()
             return data
@@ -216,39 +220,50 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <AlertDialog
-                open={interactArguments}
-                onOpenChange={(open) => setInteractArguments(open)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Launch Arguments</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            <Textarea
-                                name="arguments"
-                                placeholder="Set Launch Arguments"
-                                value={argumentsText[item.id] || ""}
-                                onChange={(e) => setArgumentsText(prev => ({
-                                    ...prev,
-                                    [item.id]: e.target.value
-                                }))}
-                            />
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
+            <Dialog open={projectSettings} onOpenChange={setProjectSettings}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Settings</DialogTitle>
+                    </DialogHeader>
+                    <div className="settings-section">
+                        <h3 className="mb-1">Port</h3>
+                        <Input
+                            name="port"
+                            placeholder="Enter Port Number"
+                            type="number"
+                            value={portNumber[item.id] || ""}
+                            onChange={(e) => setPortNumber(prev => ({
+                                ...prev,
+                                [item.id]: e.target.value
+                            }))}
+                        />
+                    </div>
+                    <div className="settings-section">
+                        <h3 className="mb-1">Launch Arguments</h3>
+                        <Textarea
+                            name="arguments"
+                            placeholder="Enter Launch Arguments"
+                            value={argumentsText[item.id] || ""}
+                            onChange={(e) => setArgumentsText(prev => ({
+                                ...prev,
+                                [item.id]: e.target.value
+                            }))}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setProjectSettings(false)}>Cancel</Button>
+                        <Button
                             onClick={(e) => {
                                 e.preventDefault()
-                                setInteractArguments(false)
+                                setProjectSettings(false)
                                 setProjectArguments.mutate()
                             }}
                         >
                             Save
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <div
                 className={
                     'rounded-md  p-5 border ' +
@@ -285,10 +300,10 @@ function ProjectCard({ item, settings }: ProjectCardProps) {
                                     <Button 
                                     onClick={(e) => {
                                         e.preventDefault()
-                                        setInteractArguments(true)
+                                        setProjectSettings(true)
                                     }}
                                     variant="outline">
-                                        Arguments
+                                        Settings
                                     </Button>
                                 )
                             )
